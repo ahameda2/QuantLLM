@@ -13,7 +13,7 @@ import tempfile
 import torch
 
 # Setting up the Streamlit page
-st.set_page_config(page_title="Chat with Multiple PDFs", page_icon="📚")
+st.set_page_config(page_title="Chat with your PDFs", page_icon="📚")
 
 # Define a class to hold the text and metadata with the expected attributes
 class Document:
@@ -35,6 +35,8 @@ if 'chain' not in st.session_state:
     st.session_state.chain = None
 if 'documents_processed' not in st.session_state:
     st.session_state.documents_processed = False
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
 # Sidebar for Hugging Face Login and PDF Upload
 with st.sidebar:
@@ -70,10 +72,10 @@ with st.sidebar:
                 documents.extend(loader.load())
                 os.remove(temp_file_path)
                 
-    #process_button = st.button("Process PDFs")
+    process_button = st.button("Process PDFs")
 
 # Main Page Interface
-st.header("Chat with Multiple PDFs 📚")
+st.header("Chat with your PDFs 📚")
 
 # Processing PDFs
 if uploaded_files:
@@ -84,8 +86,8 @@ if uploaded_files:
     # Combine all texts and split into chunks
     combined_text = " ".join([doc.page_content for doc in documents])
     DEVICE = "cuda"  # Use "cuda" for GPU
-    embeddings = SentenceTransformerEmbeddings(
-        model_name="all-MiniLM-L6-v2", model_kwargs={"device": DEVICE}
+    embeddings = HuggingFaceInstructEmbeddings(
+        model_name="hkunlp/instructor-large", model_kwargs={"device": DEVICE}
     )
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
     split_text = text_splitter.split_documents(documents)
@@ -107,7 +109,8 @@ if st.session_state.documents_processed:
     user_query = st.text_input("Ask a question about your documents:", key="user_query")
     if st.button("Submit"):
         if st.session_state.chain and user_query:
-            result = st.session_state.chain({'question': user_query, 'chat_history': []})
+            result = st.session_state.chain({'question': user_query, 'chat_history': st.session_state.chat_history})
+            st.session_state.chat_history.append((user_query, result['answer']))
             st.write('Answer:', result['answer'])
         else:
             st.warning("Please process PDFs before asking questions.")
